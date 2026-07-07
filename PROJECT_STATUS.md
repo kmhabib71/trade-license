@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phase 0 ✅ + Phase 1 ✅ complete (seeded & verified on Atlas). Next: Phase 1.5 (auth/tenancy).
-**Overall progress:** Data layer live — models + seed run against MongoDB Atlas, data reads back OK.
+**Current phase:** Phases 0, 1, 1.5 ✅ complete (auth + tenancy + subscription gate verified live). Next: Phase 2 (upload & Cloudinary).
+**Overall progress:** SaaS core working — login (email/JWT), role fencing, tenant scoping, and the ৳500 subscription paywall all tested end-to-end on the dev server.
 
 ---
 
@@ -17,7 +17,8 @@
 | Planning | Plan + status docs, decisions locked (now SaaS + archive) | ✅ Done |
 | 0 | Scaffold & infra (Next.js, PWA, env, fonts, helpers) | ✅ Done |
 | 1 | Data layer (Mongoose: License + Tenant/User/Subscription, seed, Zod) | ✅ Done |
-| 1.5 | Auth, tenancy & subscription gate (SaaS core) | ⬜ Not started |
+| 1.5 | Auth, tenancy & subscription gate (SaaS core) | ✅ Done |
+| 2 | Upload & storage (Cloudinary, upload UI/API) | ⬜ Not started |
 | 1 | Data layer (Mongoose, License model, seed, Zod) | ⬜ Not started |
 | 2 | Upload & storage (Cloudinary, upload UI/API) | ⬜ Not started |
 | 3 | Extraction pipeline (Python OCR/crop, PDF text, AI fallback, review screen) | ⬜ Not started |
@@ -46,6 +47,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
 - [x] 1.3 `Tenant`/`User`/`Subscription` models (`src/models/*`); shared enums (`src/lib/types.ts`)
 - [x] 1.4 Seed script — admin + demo tenant/inspector + subscription + sample license (`scripts/seed.ts`); run & verified on Atlas
 - [x] 1.5 Zod validation (`src/lib/validation.ts`) — license input, list filters, login
+
+### Phase 1.5 — Auth, tenancy & subscription gate (SaaS core)
+- [x] 1.5.1 Email/password login (bcrypt) + JWT session cookie + logout (`session.ts`, `api/auth/*`)
+- [x] 1.5.2 Roles + edge `proxy.ts` (Next 16 middleware) guarding all pages by role
+- [x] 1.5.3 `withTenant()` / `requireUser` / `requireRole` server guards (`src/lib/auth.ts`)
+- [x] 1.5.4 Subscription guard → `/billing` paywall when inactive (verified expire→redirect, restore→ok)
+- [x] UI: `/login`, `/dashboard` (inspector), `/admin`, `/billing`; `/` redirects by role
+
+**Verified end-to-end (dev server):** unauth→login redirect · valid login · wrong-pass 401 ·
+role fencing (inspector⊥/admin, admin⊥/dashboard) · logout · subscription expire/restore gate.
 
 ### Phase 2 — Upload & storage
 - [ ] 2.1 Cloudinary helper
@@ -117,6 +128,17 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
 | `src/models/License.ts` | 1 | License model — full fields, archive chain, tenant-scoped + text indexes |
 | `src/lib/validation.ts` | 1 | Zod: `licenseInputSchema`, `licenseFilterSchema`, `loginSchema` |
 | `scripts/seed.ts` | 1 | Seeds admin + demo tenant/inspector + subscription + sample license |
+| `src/lib/session.ts` | 1.5 | JWT sign/verify (jose) + session cookie options |
+| `src/lib/auth.ts` | 1.5 | Server guards: `getSession`/`requireUser`/`requireRole`/`withTenant`/subscription |
+| `src/proxy.ts` | 1.5 | Edge middleware (Next 16 `proxy`) — auth + role-based route fencing |
+| `src/app/api/auth/login/route.ts` | 1.5 | Login: verify creds, set JWT cookie, role redirect |
+| `src/app/api/auth/logout/route.ts` | 1.5 | Logout: clears session cookie |
+| `src/app/login/{page,LoginForm}.tsx` | 1.5 | Login page (Suspense) + client form |
+| `src/app/dashboard/page.tsx` | 1.5 | Inspector dashboard (subscription-gated) with counts |
+| `src/app/billing/page.tsx` | 1.5 | Subscription status / paywall page |
+| `src/app/admin/page.tsx` | 1.5 | Super-admin panel (platform counts) |
+| `src/components/LogoutButton.tsx` | 1.5 | Client logout button |
+| `src/app/page.tsx` | 1.5 | Root — redirects to /login or role home |
 
 ---
 
@@ -153,7 +175,12 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
   archive chain), Zod schemas, and seed script. Credentials set in gitignored `.env.local`;
   Cloudinary folder = `trade-license` (`CLOUDINARY_FOLDER`). **Seeded & verified on Atlas**
   (2 users, sample license total=8015/due, personKey=lic:6515). `npm run build` passes.
-  Next: **Phase 1.5** auth + tenancy + subscription gate.
+- **2026-07-07 (6)** — **Phase 1.5 complete.** Auth = email/password (chose option A). Installed
+  jose + server-only. Built JWT session, server guards, edge `proxy.ts` route fencing, login/logout
+  APIs, and login/dashboard/admin/billing pages. Fixed two Next 16 issues (Suspense around
+  `useSearchParams`; `middleware`→`proxy` rename). **Verified live** on dev server (all auth +
+  subscription-gate cases pass). `npm run build` passes. Next: **Phase 2** upload + Cloudinary
+  (folder `trade-license`).
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`
