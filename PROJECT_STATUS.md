@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phases 0, 1, 1.5 ✅ complete (auth + tenancy + subscription gate verified live). Next: Phase 2 (upload & Cloudinary).
-**Overall progress:** SaaS core working — login (email/JWT), role fencing, tenant scoping, and the ৳500 subscription paywall all tested end-to-end on the dev server.
+**Current phase:** Phases 0, 1, 1.5, 2 ✅ complete (upload → Cloudinary verified live). Next: Phase 3 (extraction pipeline).
+**Overall progress:** SaaS core + upload working — login/JWT, role fencing, tenant scoping, ৳500 paywall, and tenant-namespaced Cloudinary upload all tested end-to-end.
 
 ---
 
@@ -18,15 +18,14 @@
 | 0 | Scaffold & infra (Next.js, PWA, env, fonts, helpers) | ✅ Done |
 | 1 | Data layer (Mongoose: License + Tenant/User/Subscription, seed, Zod) | ✅ Done |
 | 1.5 | Auth, tenancy & subscription gate (SaaS core) | ✅ Done |
-| 2 | Upload & storage (Cloudinary, upload UI/API) | ⬜ Not started |
-| 1 | Data layer (Mongoose, License model, seed, Zod) | ⬜ Not started |
-| 2 | Upload & storage (Cloudinary, upload UI/API) | ⬜ Not started |
+| 2 | Upload & storage (Cloudinary, upload UI/API) | ✅ Done |
 | 3 | Extraction pipeline (Python OCR/crop, PDF text, AI fallback, review screen) | ⬜ Not started |
 | 4 | List view (9 columns, thumbnails, print) | ⬜ Not started |
 | 5 | Filters (≥10) | ⬜ Not started |
-| 6 | Detail & CRUD + print | ⬜ Not started |
+| 6 | Detail & CRUD + print + renewal archive | ⬜ Not started |
 | 7 | Invoice & bulk SMS (BD gateway + WhatsApp stub) | ⬜ Not started |
-| 8 | PWA polish, auth, deploy, QA | ⬜ Not started |
+| 7.5 | Super-admin & billing (SaaS) | ⬜ Not started |
+| 8 | PWA polish, deploy, QA | ⬜ Not started |
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started
 
@@ -59,9 +58,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
 role fencing (inspector⊥/admin, admin⊥/dashboard) · logout · subscription expire/restore gate.
 
 ### Phase 2 — Upload & storage
-- [ ] 2.1 Cloudinary helper
-- [ ] 2.2 Upload UI (photo/PDF, preview)
-- [ ] 2.3 /api/upload route
+- [x] 2.1 Cloudinary helper — tenant-namespaced uploads under `trade-license/` (`src/lib/cloudinary.ts`)
+- [x] 2.2 Upload UI — camera/file picker, image preview + PDF badge, progress (`src/app/upload/*`)
+- [x] 2.3 `/api/upload` — auth+tenant scoped, type/size validation, returns Cloudinary URL
+
+**Verified live:** real 832KB sample PDF uploaded → Cloudinary URL under
+`trade-license/<tenantId>/licenses/`; wrong type→415; unauth→401 JSON. Also fixed proxy
+matcher to exclude `/api` so API routes return JSON status (not HTML redirects).
 
 ### Phase 3 — Extraction pipeline
 - [ ] 3.1 Python FastAPI scaffold (/ocr, /crop)
@@ -139,6 +142,9 @@ role fencing (inspector⊥/admin, admin⊥/dashboard) · logout · subscription 
 | `src/app/admin/page.tsx` | 1.5 | Super-admin panel (platform counts) |
 | `src/components/LogoutButton.tsx` | 1.5 | Client logout button |
 | `src/app/page.tsx` | 1.5 | Root — redirects to /login or role home |
+| `src/lib/cloudinary.ts` | 2 | Cloudinary upload/delete helper (tenant-namespaced folders) |
+| `src/app/api/upload/route.ts` | 2 | Upload API — auth+tenant, validates type/size, → Cloudinary |
+| `src/app/upload/{page,UploadClient}.tsx` | 2 | Upload page (gated) + client picker/preview/progress |
 
 ---
 
@@ -179,8 +185,14 @@ role fencing (inspector⊥/admin, admin⊥/dashboard) · logout · subscription 
   jose + server-only. Built JWT session, server guards, edge `proxy.ts` route fencing, login/logout
   APIs, and login/dashboard/admin/billing pages. Fixed two Next 16 issues (Suspense around
   `useSearchParams`; `middleware`→`proxy` rename). **Verified live** on dev server (all auth +
-  subscription-gate cases pass). `npm run build` passes. Next: **Phase 2** upload + Cloudinary
-  (folder `trade-license`).
+  subscription-gate cases pass). `npm run build` passes.
+- **2026-07-07 (7)** — **Phase 2 complete.** Installed cloudinary SDK. Built tenant-namespaced
+  upload helper, `/api/upload` (auth + type/size validation), and the upload UI (camera/file
+  picker, preview, progress). **Verified live**: real sample PDF → Cloudinary URL under
+  `trade-license/<tenantId>/licenses/`. Fixed proxy matcher to exclude `/api`. `npm run build`
+  passes. (Note: on Windows, `next dev` sometimes leaves stray servers on 3000/3001 — kill by
+  PID via `taskkill //F //PID`; curl needs Windows-style file paths, not `/tmp`.)
+  Next: **Phase 3** extraction (Python OCR/crop + PDF text + AI fallback + review screen).
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`

@@ -40,7 +40,15 @@ export default async function DashboardPage() {
             {tenant?.name} · স্বাগতম, {session.name}
           </p>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-2">
+          <a
+            href="/upload"
+            className="rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
+          >
+            + লাইসেন্স আপলোড
+          </a>
+          <LogoutButton />
+        </div>
       </header>
 
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">

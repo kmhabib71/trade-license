@@ -48,8 +48,9 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Guard everything except Next internals, static assets, the manifest, and auth APIs.
+  // Guard page routes only. API routes (/api/*) enforce their own auth and return
+  // JSON status codes, so they're excluded here (no HTML redirect for API clients).
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon-.*\\.png).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon-.*\\.png).*)",
   ],
 };
