@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phases 0, 1, 1.5, 2 ✅ complete (upload → Cloudinary verified live). Next: Phase 3 (extraction pipeline).
-**Overall progress:** SaaS core + upload working — login/JWT, role fencing, tenant scoping, ৳500 paywall, and tenant-namespaced Cloudinary upload all tested end-to-end.
+**Current phase:** Phases 0, 1, 1.5, 2, 3 ✅ complete (extract → review → save verified live). Next: Phase 4 (list view).
+**Overall progress:** SaaS core + upload + **extraction** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, and photo/PDF → AI-vision extract → editable review → save all tested end-to-end against the real sample license.
 
 ---
 
@@ -19,7 +19,7 @@
 | 1 | Data layer (Mongoose: License + Tenant/User/Subscription, seed, Zod) | ✅ Done |
 | 1.5 | Auth, tenancy & subscription gate (SaaS core) | ✅ Done |
 | 2 | Upload & storage (Cloudinary, upload UI/API) | ✅ Done |
-| 3 | Extraction pipeline (Python OCR/crop, PDF text, AI fallback, review screen) | ⬜ Not started |
+| 3 | Extraction pipeline (OCR-first→AI, review/confirm, save) | ✅ Done (Python OCR svc scaffolded, deferred) |
 | 4 | List view (9 columns, thumbnails, print) | ⬜ Not started |
 | 5 | Filters (≥10) | ⬜ Not started |
 | 6 | Detail & CRUD + print + renewal archive | ⬜ Not started |
@@ -67,14 +67,23 @@ role fencing (inspector⊥/admin, admin⊥/dashboard) · logout · subscription 
 matcher to exclude `/api` so API routes return JSON status (not HTML redirects).
 
 ### Phase 3 — Extraction pipeline
-- [ ] 3.1 Python FastAPI scaffold (/ocr, /crop)
-- [ ] 3.2 /ocr Tesseract ben+eng + preprocessing
-- [ ] 3.3 /crop owner-photo detect + Cloudinary
-- [ ] 3.4 PDF text-layer parser
-- [ ] 3.5 Field mapper (Bengali labels → schema)
-- [ ] 3.6 AI vision fallback
-- [ ] 3.7 /api/extract orchestrator
-- [ ] 3.8 Review & confirm screen
+> **Reframe (user, this session):** licenses arrive as **hard-copy paper → phone photo**, not PDF. So the
+> **photo path is primary**; extraction is **OCR-first → AI fallback**; PDFs are the rare bonus case.
+- [~] 3.1 Python FastAPI scaffold (`/ocr`, `/crop`) — **scaffolded & deferred** (`python-service/`); Node falls back to AI when it's not running
+- [~] 3.2 /ocr Tesseract ben+eng + preprocessing — implemented in the scaffold (needs the Tesseract binary + ben/eng data to run)
+- [ ] 3.3 /crop owner-photo detect + Cloudinary — stub (returns 501; later sub-phase)
+- [x] 3.4 PDF text-layer — folded into the AI path (Claude reads the PDF `document` block directly; no separate parser)
+- [x] 3.5 Field mapper (Bengali labels → schema) — `FIELD_LABELS` + `mapOcrTextToDraft` (`lib/extraction/ocr.ts`, `fields.ts`)
+- [x] 3.6 AI vision fallback — Claude `claude-opus-4-8` vision/PDF → structured JSON (`lib/extraction/ai.ts`)
+- [x] 3.7 /api/extract orchestrator — OCR-first → AI (`lib/extraction/orchestrator.ts`, `api/extract`)
+- [x] 3.8 Review & confirm screen — editable pre-filled form → `/api/licenses` save (`upload/ReviewForm.tsx`, `api/licenses`)
+
+**Verified live (dev server, real sample license):** upload PDF → `/api/extract` (AI) returned an accurate
+draft (businessName উযাইর ট্রেড ভেঞ্চারস, licenseNo TRAD/CHTG/006515/2024, total 8015, status renewed, Bengali
+digits → Western) → edited → `/api/licenses` saved **201** with derived `referenceYear`/`fiscalYear`/`personKey`
+and `dd/mm/yyyy`→ISO dates. Guards: duplicate licenseNo→409, unauth extract/save→401. `npm run build` passes.
+**Two integration fixes:** extract reads the uploaded **bytes directly** (Cloudinary blocks public PDF delivery →
+URL fetch 401s); added `parseBanglaDate` for `dd/mm/yyyy` license dates (Zod `coerce.date` rejects them).
 
 ### Phase 4 — List view
 - [ ] 4.1 /api/licenses list (filters+pagination+sort+search)
@@ -144,7 +153,16 @@ matcher to exclude `/api` so API routes return JSON status (not HTML redirects).
 | `src/app/page.tsx` | 1.5 | Root — redirects to /login or role home |
 | `src/lib/cloudinary.ts` | 2 | Cloudinary upload/delete helper (tenant-namespaced folders) |
 | `src/app/api/upload/route.ts` | 2 | Upload API — auth+tenant, validates type/size, → Cloudinary |
-| `src/app/upload/{page,UploadClient}.tsx` | 2 | Upload page (gated) + client picker/preview/progress |
+| `src/app/upload/{page,UploadClient}.tsx` | 2 | Upload page (gated) + client: picker/preview → upload → extract → review |
+| `src/lib/extraction/fields.ts` | 3 | Canonical extraction-draft Zod schema + `FIELD_LABELS` (Bengali) + `emptyDraft` + result types |
+| `src/lib/extraction/ai.ts` | 3 | AI-vision extractor — Claude `claude-opus-4-8` vision (photo) / PDF `document` block → structured JSON; Bengali→Western digit normalize |
+| `src/lib/extraction/ocr.ts` | 3 | OCR client hook — POSTs image to Python `/ocr`; field-maps Bengali labels → draft; fails soft when svc absent |
+| `src/lib/extraction/orchestrator.ts` | 3 | `extract()` — OCR-first → AI fallback; PDFs go straight to AI/text-layer; `ExtractionError` |
+| `src/app/api/extract/route.ts` | 3 | Extract API — auth+tenant, multipart file → orchestrator → draft (reads bytes, not Cloudinary URL) |
+| `src/app/api/licenses/route.ts` | 3 | Save API — Zod-validate confirmed record, derive referenceYear/fiscalYear/personKey, ISO-normalize dates, insert (409 on dup) |
+| `src/app/upload/ReviewForm.tsx` | 3 | Editable review/confirm screen — grouped Bengali fields + image preview → save; success card |
+| `src/lib/bangla.ts` (updated) | 3 | Added `parseBanglaDate` — `dd/mm/yyyy`(+Bengali digits) → ISO for Zod date coercion |
+| `python-service/{main,requirements,README}` | 3 | FastAPI OCR/crop scaffold — `/ocr` (Tesseract ben+eng), `/crop` (stub); deferred sub-phase |
 
 ---
 
@@ -158,7 +176,9 @@ matcher to exclude `/api` so API routes return JSON status (not HTML redirects).
 ## Open items (blockers to note when reached)
 - BD SMS gateway vendor + credentials (Phase 7.2)
 - WhatsApp Business API + license (Phase 7.3)
-- AI vision provider key (Phase 3.6)
+- ~~AI vision provider key (Phase 3.6)~~ ✅ ANTHROPIC_API_KEY set (Claude `claude-opus-4-8`)
+- OCR service: to enable the OCR-first path in prod, run `python-service/` with the Tesseract binary +
+  ben/eng traineddata and set `PYTHON_SERVICE_URL`; until then extraction uses the AI path (Phase 3.1–3.3)
 - Auth scope: single vs multi-inspector (Phase 8.2)
 - Hosting accounts: Vercel + Render/Railway (Phase 8.3)
 
@@ -193,6 +213,15 @@ matcher to exclude `/api` so API routes return JSON status (not HTML redirects).
   passes. (Note: on Windows, `next dev` sometimes leaves stray servers on 3000/3001 — kill by
   PID via `taskkill //F //PID`; curl needs Windows-style file paths, not `/tmp`.)
   Next: **Phase 3** extraction (Python OCR/crop + PDF text + AI fallback + review screen).
+- **2026-07-07 (8)** — **Phase 3 complete.** User reframed the workflow: licenses are **hard-copy paper →
+  phone photo** (PDFs rare), so the **photo/OCR-first→AI** path is primary. Installed `@anthropic-ai/sdk`;
+  added `ANTHROPIC_API_KEY`. Built the extraction lib (`fields`/`ai`/`ocr`/`orchestrator`), `/api/extract`
+  (OCR-first→AI), `/api/licenses` save, and the editable `ReviewForm`; wired upload→extract→review→save.
+  Python OCR/crop service **scaffolded but deferred** (Node falls back to AI when it's down). **Verified live**
+  end-to-end against the real sample license (accurate AI extraction, 201 save with derived fields, 409 dup,
+  401 unauth). Fixed two integration issues: extract now reads uploaded **bytes** (Cloudinary 401s on public
+  PDF delivery), and added `parseBanglaDate` for `dd/mm/yyyy` license dates. `npm run build` passes.
+  Next: **Phase 4** list view (9 columns + thumbnails + print).
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`

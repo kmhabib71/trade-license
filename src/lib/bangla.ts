@@ -84,3 +84,33 @@ export function fiscalYearStart(fiscalYear: string): number | null {
 export function compareFiscalYear(a: string, b: string): number {
   return (fiscalYearStart(a) ?? 0) - (fiscalYearStart(b) ?? 0);
 }
+
+/**
+ * Parse a Bangladeshi-format date string to an ISO `yyyy-mm-dd` (or null).
+ * Licenses print dates as `dd/mm/yyyy` (or `dd-mm-yyyy`, `dd.mm.yyyy`), possibly
+ * with Bengali numerals — which `new Date()` cannot parse. Normalize before
+ * handing to Zod's date coercion. Already-ISO (`yyyy-mm-dd`) input passes through.
+ */
+export function parseBanglaDate(raw: string): string | null {
+  const s = toEnglishDigits(String(raw ?? "").trim());
+  if (!s) return null;
+  // Already ISO-ish: yyyy-mm-dd
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return `${iso[1]}-${pad2(iso[2])}-${pad2(iso[3])}`;
+  }
+  // dd/mm/yyyy (separators: / - .)
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const dd = Number(d), mm = Number(m);
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+  }
+  return null;
+}
+
+function pad2(n: string | number): string {
+  return String(n).padStart(2, "0");
+}

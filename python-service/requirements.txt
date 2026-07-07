@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pytesseract>=0.3.13
+Pillow>=11.0
+# For /crop (later sub-phase): opencv-python-headless, numpy, cloudinary
