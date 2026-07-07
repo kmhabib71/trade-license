@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phase 0 — ✅ complete. Next: Phase 1 (data layer) + Phase 1.5 (auth/tenancy).
-**Overall progress:** Phase 0 done (scaffold builds clean). Plan expanded to SaaS + renewal-archive.
+**Current phase:** Phase 0 ✅ + Phase 1 ✅ complete (seeded & verified on Atlas). Next: Phase 1.5 (auth/tenancy).
+**Overall progress:** Data layer live — models + seed run against MongoDB Atlas, data reads back OK.
 
 ---
 
@@ -16,7 +16,7 @@
 |---|---|---|
 | Planning | Plan + status docs, decisions locked (now SaaS + archive) | ✅ Done |
 | 0 | Scaffold & infra (Next.js, PWA, env, fonts, helpers) | ✅ Done |
-| 1 | Data layer (Mongoose: License + Tenant/User/Subscription, seed, Zod) | ⬜ Not started |
+| 1 | Data layer (Mongoose: License + Tenant/User/Subscription, seed, Zod) | ✅ Done |
 | 1.5 | Auth, tenancy & subscription gate (SaaS core) | ⬜ Not started |
 | 1 | Data layer (Mongoose, License model, seed, Zod) | ⬜ Not started |
 | 2 | Upload & storage (Cloudinary, upload UI/API) | ⬜ Not started |
@@ -41,10 +41,11 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
 - [x] 0.5 Bangla/Western digit + fiscal-year/license-no/personKey parsers (`src/lib/bangla.ts`)
 
 ### Phase 1 — Data layer
-- [ ] 1.1 Mongoose connection singleton
-- [ ] 1.2 License schema/model + indexes
-- [ ] 1.3 Seed script (sample license)
-- [ ] 1.4 Zod validation schema
+- [x] 1.1 Mongoose connection singleton (`src/lib/db.ts`)
+- [x] 1.2 `License` model — all fields + archive chain + tenant-scoped indexes (`src/models/License.ts`)
+- [x] 1.3 `Tenant`/`User`/`Subscription` models (`src/models/*`); shared enums (`src/lib/types.ts`)
+- [x] 1.4 Seed script — admin + demo tenant/inspector + subscription + sample license (`scripts/seed.ts`); run & verified on Atlas
+- [x] 1.5 Zod validation (`src/lib/validation.ts`) — license input, list filters, login
 
 ### Phase 2 — Upload & storage
 - [ ] 2.1 Cloudinary helper
@@ -107,7 +108,15 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
 | `src/app/page.tsx` | 0 | Placeholder home page (Bangla) showing scaffold status |
 | `src/app/manifest.ts` | 0 | PWA web manifest (name, theme, icons placeholder) |
 | `src/lib/bangla.ts` | 0 | Digit conversion + `parseLicenseNo`/`parseFiscalYear`/`buildPersonKey` helpers |
-| `.env.example` | 0 | Committed env template for all integrations |
+| `.env.example` | 0 | Committed env template for all integrations (placeholders only — no secrets) |
+| `src/lib/db.ts` | 1 | Mongoose connection singleton (cached on globalThis) |
+| `src/lib/types.ts` | 1 | Shared enums (roles, statuses, license/payment/source/extraction) |
+| `src/models/Tenant.ts` | 1 | Tenant (inspector account) model |
+| `src/models/User.ts` | 1 | User model (super_admin / inspector, passwordHash) |
+| `src/models/Subscription.ts` | 1 | Subscription model (৳500/mo) + `isSubscriptionActive()` guard helper |
+| `src/models/License.ts` | 1 | License model — full fields, archive chain, tenant-scoped + text indexes |
+| `src/lib/validation.ts` | 1 | Zod: `licenseInputSchema`, `licenseFilterSchema`, `loginSchema` |
+| `scripts/seed.ts` | 1 | Seeds admin + demo tenant/inspector + subscription + sample license |
 
 ---
 
@@ -137,4 +146,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started
   (super-admin/billing) to the plan.
 - **2026-07-07 (3)** — **Phase 0 complete.** Scaffolded Next.js 16 app (TS, Tailwind 4, App
   Router, `src/`) into project root; Bangla font + theme + PWA manifest + env template +
-  `src/lib/bangla.ts` helpers. `npm run build` passes. Next: Phase 1 data layer + Phase 1.5 auth.
+  `src/lib/bangla.ts` helpers. `npm run build` passes.
+- **2026-07-07 (4)** — Pushed to GitHub (`kmhabib71/trade-license`, branch `main`).
+- **2026-07-07 (5)** — **Phase 1 complete.** Installed mongoose/zod/bcryptjs/tsx. Built db
+  singleton, shared enums, Tenant/User/Subscription/License models (tenant-scoped indexes +
+  archive chain), Zod schemas, and seed script. Credentials set in gitignored `.env.local`;
+  Cloudinary folder = `trade-license` (`CLOUDINARY_FOLDER`). **Seeded & verified on Atlas**
+  (2 users, sample license total=8015/due, personKey=lic:6515). `npm run build` passes.
+  Next: **Phase 1.5** auth + tenancy + subscription gate.
+
+## Seeded demo credentials (dev)
+- super_admin: `admin@tradelicense.local` / `admin123`
+- inspector:   `inspector@tradelicense.local` / `inspector123`
+- tenant: চট্টগ্রাম ডেমো ইন্সপেক্টর (`demo-chattogram`)
