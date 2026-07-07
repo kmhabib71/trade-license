@@ -42,6 +42,12 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <a
+            href="/licenses"
+            className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            তালিকা দেখুন
+          </a>
+          <a
             href="/upload"
             className="rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
           >
@@ -64,7 +70,9 @@ export default async function DashboardPage() {
       </section>
 
       <p className="mt-8 text-sm text-slate-400">
-        পরবর্তী ধাপ: আপলোড ও এক্সট্রাকশন (Phase 2–3), তারপর লিস্ট ভিউ ও ফিল্টার।
+        <a href="/licenses" className="text-brand underline">
+          সম্পূর্ণ লাইসেন্স তালিকা দেখুন →
+        </a>
       </p>
     </div>
   );

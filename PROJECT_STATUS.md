@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phases 0, 1, 1.5, 2, 3 ✅ complete (extract → review → save verified live). Next: Phase 4 (list view).
-**Overall progress:** SaaS core + upload + **extraction** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, and photo/PDF → AI-vision extract → editable review → save all tested end-to-end against the real sample license.
+**Current phase:** Phases 0, 1, 1.5, 2, 3, 4 ✅ complete (list view verified live). Next: Phase 5 (filters ≥10).
+**Overall progress:** SaaS core + upload + extraction + **list view** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, photo/PDF → AI extract → review → save, and the filterable/paginated journal list with row→detail, all tested end-to-end (incl. tenant-isolation).
 
 ---
 
@@ -20,7 +20,7 @@
 | 1.5 | Auth, tenancy & subscription gate (SaaS core) | ✅ Done |
 | 2 | Upload & storage (Cloudinary, upload UI/API) | ✅ Done |
 | 3 | Extraction pipeline (OCR-first→AI, review/confirm, save) | ✅ Done (Python OCR svc scaffolded, deferred) |
-| 4 | List view (9 columns, thumbnails, print) | ⬜ Not started |
+| 4 | List view (9 columns, thumbnails, print, row→detail) | ✅ Done |
 | 5 | Filters (≥10) | ⬜ Not started |
 | 6 | Detail & CRUD + print + renewal archive | ⬜ Not started |
 | 7 | Invoice & bulk SMS (BD gateway + WhatsApp stub) | ⬜ Not started |
@@ -86,10 +86,16 @@ and `dd/mm/yyyy`→ISO dates. Guards: duplicate licenseNo→409, unauth extract/
 URL fetch 401s); added `parseBanglaDate` for `dd/mm/yyyy` license dates (Zod `coerce.date` rejects them).
 
 ### Phase 4 — List view
-- [ ] 4.1 /api/licenses list (filters+pagination+sort+search)
-- [ ] 4.2 List table (9 columns + thumbnail + print btn)
-- [ ] 4.3 Bangla serial, paid/due badge, mobile cards
-- [ ] 4.4 Row click → detail
+- [x] 4.1 GET `/api/licenses` — filters + pagination + sort + text search (`api/licenses`, `lib/licenseQuery.ts`)
+- [x] 4.2 List table — 9 columns (serial · licenseNo · নাম · পুরাতন নং · রেফ বছর · অর্থ বছর · ছবি · পেইড/ডিউ · প্রিন্ট) + owner-photo thumbnail + per-row print link
+- [x] 4.3 Bangla serials, paid/due badge (with due amount), responsive mobile card view
+- [x] 4.4 Row click → `/licenses/[id]` minimal read-only detail (full CRUD/print = Phase 6)
+
+**Verified live (dev server, 6 seeded records across 2 fiscal years + a 2nd tenant):** list renders;
+search by name + by licenseNo substring; `paymentStatus` filter (due 4 / paid 2); `fiscalYear` filter;
+pagination (limit=2 → 3 pages, distinct rows); `sort=businessName`; detail page 200; bad/invalid id → 404;
+unauth → 401; **cross-tenant record → 404 and excluded from list** (isolation). Test data cleaned up.
+`npm run build` passes. Note: filter *inputs* (schema already wired in `buildLicenseQuery`) get their UI in Phase 5.
 
 ### Phase 5 — Filters
 - [ ] 5.1 Implement ≥10 filters + URL sync + clear-all
@@ -163,6 +169,11 @@ URL fetch 401s); added `parseBanglaDate` for `dd/mm/yyyy` license dates (Zod `co
 | `src/app/upload/ReviewForm.tsx` | 3 | Editable review/confirm screen — grouped Bengali fields + image preview → save; success card |
 | `src/lib/bangla.ts` (updated) | 3 | Added `parseBanglaDate` — `dd/mm/yyyy`(+Bengali digits) → ISO for Zod date coercion |
 | `python-service/{main,requirements,README}` | 3 | FastAPI OCR/crop scaffold — `/ocr` (Tesseract ben+eng), `/crop` (stub); deferred sub-phase |
+| `src/lib/licenseQuery.ts` | 4 | `buildLicenseQuery` (tenant-scoped filter → Mongo) + `parseSort` (whitelisted); shared by list endpoint & (Phase 5) filter bar |
+| `src/app/api/licenses/route.ts` (GET added) | 4 | List endpoint — validates `licenseFilterSchema`, builds query, paginates/sorts, returns list rows + paging meta |
+| `src/app/licenses/page.tsx` | 4 | Journal list page (gated) — server-renders page 1, hands off to the client table |
+| `src/app/licenses/LicenseTable.tsx` | 4 | Client table — 9 columns, thumbnail, print link, paid/due badge, debounced search, pagination, mobile cards, row→detail |
+| `src/app/licenses/[id]/page.tsx` | 4 | Read-only license detail (tenant-scoped; 404 on miss/cross-tenant); full CRUD/print in Phase 6 |
 
 ---
 
@@ -222,6 +233,14 @@ URL fetch 401s); added `parseBanglaDate` for `dd/mm/yyyy` license dates (Zod `co
   401 unauth). Fixed two integration issues: extract now reads uploaded **bytes** (Cloudinary 401s on public
   PDF delivery), and added `parseBanglaDate` for `dd/mm/yyyy` license dates. `npm run build` passes.
   Next: **Phase 4** list view (9 columns + thumbnails + print).
+- **2026-07-07 (9)** — **Phase 4 complete.** Built the tenant-scoped list: `GET /api/licenses`
+  (filters+pagination+sort+search via `lib/licenseQuery.ts`), the `/licenses` journal page + client table
+  (9 columns, owner-photo thumbnail, paid/due badge, Bangla serials, debounced search, pagination, mobile
+  cards), and a read-only `/licenses/[id]` detail (row→detail). Linked from the dashboard. **Verified live**
+  with 6 seeded records + a 2nd tenant: search/filter/paginate/sort all correct, detail 200, bad id 404,
+  **cross-tenant record 404 + excluded from list** (isolation). Fixed a Mongoose-9 `FilterQuery` type-export
+  issue (used a local query type). Test data cleaned up. `npm run build` passes.
+  Next: **Phase 5** filters (≥10) — the filter-bar UI over the already-wired query builder.
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`
