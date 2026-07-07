@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phases 0, 1, 1.5, 2, 3, 4, 5 ✅ complete (13 filters verified live). Next: Phase 6 (detail & CRUD).
-**Overall progress:** SaaS core + upload + extraction + list + **filters** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, photo/PDF → AI extract → review → save, filterable/paginated journal list with row→detail, and a 13-filter URL-synced filter bar, all tested end-to-end (incl. tenant-isolation).
+**Current phase:** Phases 0–6 ✅ complete (full CRUD + renewal auto-archive verified live). Next: Phase 7 (invoice & bulk SMS).
+**Overall progress:** SaaS core + upload + extraction + list + filters + **full CRUD** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, photo/PDF → AI extract → review → save, filterable journal list, 13-filter bar, and manual create / edit / delete / print / **renewal auto-archive** (year-over-year personKey chain), all tested end-to-end (incl. tenant-isolation + chain self-heal on delete).
 
 ---
 
@@ -22,7 +22,7 @@
 | 3 | Extraction pipeline (OCR-first→AI, review/confirm, save) | ✅ Done (Python OCR svc scaffolded, deferred) |
 | 4 | List view (9 columns, thumbnails, print, row→detail) | ✅ Done |
 | 5 | Filters (13, URL-synced + clear-all) | ✅ Done |
-| 6 | Detail & CRUD + print + renewal archive | ⬜ Not started |
+| 6 | Detail & CRUD + print + renewal archive | ✅ Done |
 | 7 | Invoice & bulk SMS (BD gateway + WhatsApp stub) | ⬜ Not started |
 | 7.5 | Super-admin & billing (SaaS) | ⬜ Not started |
 | 8 | PWA polish, deploy, QA | ⬜ Not started |
@@ -111,11 +111,23 @@ right subset (ai 2 / ocr 1; verified yes 3 / no 2; hasPhoto yes 2 / no 3; ward, 
 the filtered set** (no all-records flash). Test data cleaned up. `npm run build` passes.
 
 ### Phase 6 — Detail & CRUD
-- [ ] 6.1 Detail view (all fields + images)
-- [ ] 6.2 Manual create
-- [ ] 6.3 Edit/update
-- [ ] 6.4 Delete w/ confirm
-- [ ] 6.5 Print single record
+- [x] 6.1 Detail view — all fields + fees + license image + actions (`licenses/[id]/page.tsx`)
+- [x] 6.2 Manual create — blank `LicenseForm` → auto-archive-aware POST (`licenses/new`, `LicenseForm.tsx`)
+- [x] 6.3 Edit/update — prefilled form → PUT `/api/licenses/[id]` (`licenses/[id]/edit`)
+- [x] 6.4 Delete w/ confirm — inline confirm → DELETE, **restores superseded prior-year to active** (chain self-heal)
+- [x] 6.5 Print single record — `window.print()` + `@media print` stylesheet + `print:hidden` chrome
+- [x] 6.6 **Renewal auto-archive (§1a)** — on create, matching `personKey` with older `fiscalYear` → old record
+  `archived+isActive=false+supersededBy`, new record `previousLicenseId`+`paymentStatus=due` (`lib/licenseWrite.ts`)
+- [x] 6.7 Detail **archive history chain** — every year's record for the person (active+archived), newest-first, with
+  active/archive badges + "show archived" list filter (already wired in Phase 5)
+
+**Verified live (2-year renewal chain, personKey lic:7777):** create 2025-26 → create 2026-27 auto-archives the
+prior year (old inactive+archived+supersededBy; new active+previousLicenseId+due) and returns `archivedPreviousId`;
+default list excludes archived, `showArchived=1` shows both; **edit (PUT)** persists; **delete (DELETE)** the active
+record restores the prior year to active; detail page renders the history chain + edit/delete/print actions;
+create/edit pages render (prefilled). Guards: bad-id PUT/DELETE → 404, unauth → 401. Test data cleaned up.
+Fixed a client/server-boundary bug: `emptyFormValues`/types were exported from a `"use client"` module and called
+by server pages (500) → hoisted to `src/lib/licenseFormValues.ts`. `npm run build` passes.
 
 ### Phase 7 — Invoice & bulk SMS
 - [ ] 7.1 Invoice generator
@@ -188,6 +200,15 @@ the filtered set** (no all-records flash). Test data cleaned up. `npm run build`
 | `src/app/licenses/LicenseTable.tsx` (updated) | 5 | Now owns filter state, URL sync (`useSearchParams`/`router.replace`), debounced refetch; renders `FilterBar` |
 | `src/app/licenses/page.tsx` (updated) | 5 | Accepts `searchParams`, server-renders honoring URL filters, wraps table in `<Suspense>` |
 | `src/lib/validation.ts` / `src/lib/licenseQuery.ts` (updated) | 5 | Added `extractionMethod` + `verified` to `licenseFilterSchema` and the query builder (filter 13) |
+| `src/lib/licenseWrite.ts` | 6 | `createLicense` (with renewal auto-archive §1a) + `updateLicense` + `parseLicensePayload` (date-normalize + Zod); shared by POST/PUT |
+| `src/lib/licenseFormValues.ts` | 6 | Neutral `LicenseFormValues` type + `emptyFormValues` (importable by both client form & server pages) |
+| `src/app/api/licenses/[id]/route.ts` | 6 | GET one / PUT update / DELETE (with chain-repair), tenant-scoped, 404/409 guards |
+| `src/app/licenses/LicenseForm.tsx` | 6 | Reusable grouped create/edit form → POST or PUT → detail redirect |
+| `src/app/licenses/new/page.tsx` | 6 | Manual-create page (blank form) |
+| `src/app/licenses/[id]/edit/page.tsx` | 6 | Edit page — loads record, maps to form values (dates→dd/mm/yyyy) |
+| `src/app/licenses/[id]/DetailActions.tsx` | 6 | Client edit/print/delete bar (inline delete-confirm) |
+| `src/app/licenses/[id]/page.tsx` (updated) | 6 | Detail: actions bar, archived banner, archive history chain |
+| `src/app/globals.css` (updated) | 6 | `@media print` — clean light single-record printout |
 
 ---
 
@@ -263,6 +284,15 @@ the filtered set** (no all-records flash). Test data cleaned up. `npm run build`
   right subset, combined filters AND correctly, and bookmarked filtered URLs server-render filtered. Cleaned up test
   data. `npm run build` passes. Next: **Phase 6** detail & CRUD (manual create/edit/delete + single-record print +
   renewal auto-archive §1a).
+- **2026-07-07 (11)** — **Phase 6 complete.** Built full CRUD + the renewal-archive engine: `lib/licenseWrite.ts`
+  (`createLicense` applies §1a auto-archive, `updateLicense`, shared `parseLicensePayload`), `/api/licenses/[id]`
+  (GET/PUT/DELETE with chain-repair), a reusable `LicenseForm` (create + edit), the `/licenses/new` and
+  `/licenses/[id]/edit` pages, and enhanced the detail page (edit/print/delete actions, archived banner, year-by-year
+  archive history chain + print stylesheet). **Verified live** on a 2-year renewal chain: auto-archive on renewal,
+  archived-exclusion + showArchived, edit persist, delete restores the prior year, history chain renders, guards
+  (404/401). Fixed a client/server-boundary 500 (hoisted `emptyFormValues`/types out of the `"use client"` form into
+  `lib/licenseFormValues.ts`; saved to memory). `npm run build` passes. Next: **Phase 7** invoice & bulk SMS
+  (BD gateway adapter + WhatsApp stub) — note the **open blocker**: BD SMS vendor + credentials.
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`

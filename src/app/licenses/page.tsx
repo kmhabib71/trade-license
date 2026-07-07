@@ -81,6 +81,12 @@ export default async function LicensesPage({
             ড্যাশবোর্ড
           </a>
           <a
+            href="/licenses/new"
+            className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            + নতুন
+          </a>
+          <a
             href="/upload"
             className="rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
           >

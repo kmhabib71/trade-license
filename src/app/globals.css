@@ -26,3 +26,19 @@ body {
   color: var(--foreground);
   font-family: var(--font-bengali), Arial, Helvetica, sans-serif;
 }
+
+/* Single-record print (Phase 6.5): force a clean light printout regardless of
+   the viewer's theme, and let the detail card use the full page width. */
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+  }
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}
