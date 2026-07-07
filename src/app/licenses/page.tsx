@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession, hasActiveSubscription } from "@/lib/auth";
 import { dbConnect } from "@/lib/db";
@@ -7,9 +8,14 @@ import { buildLicenseQuery, parseSort } from "@/lib/licenseQuery";
 import LogoutButton from "@/components/LogoutButton";
 import LicenseTable, { type LicenseRow } from "./LicenseTable";
 
-/** Phase 4 — the journal list. Server-gated; renders the first page server-side,
- *  the client table handles search + pagination from /api/licenses thereafter. */
-export default async function LicensesPage() {
+/** Phase 4/5 — the journal list + filters. Server-gated; renders the first page
+ *  server-side honoring any URL filters, the client table + FilterBar drive
+ *  /api/licenses (and keep the URL in sync) thereafter. */
+export default async function LicensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await getSession();
   if (!session || session.role !== "inspector" || !session.tenantId) {
     redirect("/login");
@@ -19,7 +25,10 @@ export default async function LicensesPage() {
   }
 
   await dbConnect();
-  const f = licenseFilterSchema.parse({}); // defaults: page 1, limit 25, -createdAt
+  const sp = await searchParams;
+  // Parse URL params through the filter schema (invalid → defaults) for the
+  // server-side first paint of a shared/bookmarked filtered URL.
+  const f = licenseFilterSchema.catch(licenseFilterSchema.parse({})).parse(sp);
   const query = buildLicenseQuery(session.tenantId, f);
   const [docs, total] = await Promise.all([
     License.find(query)
@@ -82,7 +91,9 @@ export default async function LicensesPage() {
       </header>
 
       <section className="mt-8">
-        <LicenseTable initial={initial} />
+        <Suspense fallback={<p className="text-sm text-slate-500">লোড হচ্ছে…</p>}>
+          <LicenseTable initial={initial} />
+        </Suspense>
       </section>
     </div>
   );

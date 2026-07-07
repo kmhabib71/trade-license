@@ -93,6 +93,8 @@ export const licenseFilterSchema = z.object({
   dueMin: z.coerce.number().optional(),
   dueMax: z.coerce.number().optional(),
   hasPhoto: z.enum(["yes", "no"]).optional(),
+  extractionMethod: z.enum(EXTRACTION_METHOD).optional(),
+  verified: z.enum(["yes", "no"]).optional(),
   showArchived: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(25),

@@ -59,6 +59,11 @@ export function buildLicenseQuery(
     q.amountDue = range;
   }
 
+  // Extraction method / verified (source quality).
+  if (f.extractionMethod) q.extractionMethod = f.extractionMethod;
+  if (f.verified === "yes") q.verified = true;
+  else if (f.verified === "no") q.verified = { $ne: true };
+
   // Has owner photo.
   if (f.hasPhoto === "yes") {
     q.ownerPhotoUrl = { $nin: [null, ""] };

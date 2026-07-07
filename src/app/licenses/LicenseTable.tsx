@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toBanglaDigits } from "@/lib/bangla";
+import FilterBar, { type Filters } from "./FilterBar";
 
 export interface LicenseRow {
   id: string;
@@ -32,53 +33,89 @@ interface Props {
   initial: ListResponse;
 }
 
+/** Filter keys that live in the URL (everything except paging). */
+const FILTER_KEYS: (keyof Filters)[] = [
+  "q", "licenseNo", "oldLicenseNo", "status", "paymentStatus", "fiscalYear",
+  "referenceYear", "ward", "area", "dateFrom", "dateTo", "dueMin", "dueMax",
+  "hasPhoto", "extractionMethod", "verified", "showArchived",
+];
+
+function filtersFromParams(params: URLSearchParams): Filters {
+  const f: Filters = {};
+  for (const k of FILTER_KEYS) {
+    const v = params.get(k);
+    if (v) f[k] = v;
+  }
+  return f;
+}
+
+/** Build the API/URL query string from filters + page. `showArchived` maps to
+ *  the API's truthy `showArchived`; empty values are omitted. */
+function toQuery(filters: Filters, page: number): string {
+  const p = new URLSearchParams();
+  for (const k of FILTER_KEYS) {
+    const v = filters[k];
+    if (v) p.set(k, v);
+  }
+  if (page > 1) p.set("page", String(page));
+  return p.toString();
+}
+
 export default function LicenseTable({ initial }: Props) {
   const router = useRouter();
-  const [data, setData] = useState<ListResponse>(initial);
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
 
-  const load = useCallback(async (search: string, pageNum: number) => {
+  const [filters, setFilters] = useState<Filters>(() =>
+    filtersFromParams(new URLSearchParams(searchParams.toString())),
+  );
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<ListResponse>(initial);
+  const [loading, setLoading] = useState(false);
+  const firstRender = useRef(true);
+
+  const load = useCallback(async (query: string) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("q", search.trim());
-      params.set("page", String(pageNum));
-      const res = await fetch(`/api/licenses?${params}`);
+      const res = await fetch(`/api/licenses?${query}`);
       if (res.ok) setData((await res.json()) as ListResponse);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Debounced search.
+  // On any filter/page change: sync the URL and refetch. Debounced so typing in
+  // text inputs doesn't fire a request per keystroke. The very first run is
+  // skipped — the server already rendered `initial` for the current URL.
   useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const query = toQuery(filters, page);
     const t = setTimeout(() => {
-      setPage(1);
-      load(q, 1);
-    }, 350);
+      router.replace(`/licenses${query ? `?${query}` : ""}`, { scroll: false });
+      load(query);
+    }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [filters, page]);
+
+  function onFilterChange(next: Filters) {
+    setPage(1); // any filter change resets to page 1
+    setFilters(next);
+  }
 
   function goPage(p: number) {
     setPage(p);
-    load(q, p);
   }
 
   const startSerial = (data.page - 1) * data.limit;
 
   return (
     <div className="space-y-4">
-      {/* Search */}
+      <FilterBar value={filters} onChange={onFilterChange} />
+
       <div className="flex items-center gap-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="নাম / প্রতিষ্ঠান / লাইসেন্স নম্বর খুঁজুন…"
-          className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900"
-        />
         <span className="text-sm text-slate-500">
           মোট {toBanglaDigits(data.total)} টি
         </span>

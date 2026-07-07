@@ -5,8 +5,8 @@
 > Plan of record: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 **Last updated:** 2026-07-07
-**Current phase:** Phases 0, 1, 1.5, 2, 3, 4 ✅ complete (list view verified live). Next: Phase 5 (filters ≥10).
-**Overall progress:** SaaS core + upload + extraction + **list view** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, photo/PDF → AI extract → review → save, and the filterable/paginated journal list with row→detail, all tested end-to-end (incl. tenant-isolation).
+**Current phase:** Phases 0, 1, 1.5, 2, 3, 4, 5 ✅ complete (13 filters verified live). Next: Phase 6 (detail & CRUD).
+**Overall progress:** SaaS core + upload + extraction + list + **filters** working — login/JWT, role fencing, tenant scoping, ৳500 paywall, Cloudinary upload, photo/PDF → AI extract → review → save, filterable/paginated journal list with row→detail, and a 13-filter URL-synced filter bar, all tested end-to-end (incl. tenant-isolation).
 
 ---
 
@@ -21,7 +21,7 @@
 | 2 | Upload & storage (Cloudinary, upload UI/API) | ✅ Done |
 | 3 | Extraction pipeline (OCR-first→AI, review/confirm, save) | ✅ Done (Python OCR svc scaffolded, deferred) |
 | 4 | List view (9 columns, thumbnails, print, row→detail) | ✅ Done |
-| 5 | Filters (≥10) | ⬜ Not started |
+| 5 | Filters (13, URL-synced + clear-all) | ✅ Done |
 | 6 | Detail & CRUD + print + renewal archive | ⬜ Not started |
 | 7 | Invoice & bulk SMS (BD gateway + WhatsApp stub) | ⬜ Not started |
 | 7.5 | Super-admin & billing (SaaS) | ⬜ Not started |
@@ -98,7 +98,17 @@ unauth → 401; **cross-tenant record → 404 and excluded from list** (isolatio
 `npm run build` passes. Note: filter *inputs* (schema already wired in `buildLicenseQuery`) get their UI in Phase 5.
 
 ### Phase 5 — Filters
-- [ ] 5.1 Implement ≥10 filters + URL sync + clear-all
+- [x] 5.1 **13 filters** + URL sync + clear-all (`app/licenses/FilterBar.tsx`, `LicenseTable.tsx`)
+  1. নাম/প্রতিষ্ঠান/লাইসেন্স search · 2. licenseNo · 3. oldLicenseNo · 4. নতুন/নবায়নকৃত · 5. পেইড/ডিউ ·
+  6. অর্থ বছর · 7. রেফারেন্স বছর · 8. ওয়ার্ড · 9. এলাকা/মার্কেট · 10. ইস্যু-তারিখ পরিসর ·
+  11. বকেয়া পরিমাণ পরিসর · 12. ছবি আছে/নেই · 13. এক্সট্রাকশন মেথড **+ যাচাইকৃত** (added `extractionMethod`/`verified`
+  to `licenseFilterSchema` + `buildLicenseQuery`). Collapsible panel, active-filter count badge, clear-all;
+  URL is the single source of truth (server first-paint honors it, client keeps it in sync, any filter → page 1).
+
+**Verified live (5 seeded records spanning method/verified/status/photo/ward/fy/due):** every filter returns the
+right subset (ai 2 / ocr 1; verified yes 3 / no 2; hasPhoto yes 2 / no 3; ward, fy, refYear, due-range, status);
+**combined filters AND correctly** (ai+due → 2; verified+ward → 1); and a **bookmarked filtered URL server-renders
+the filtered set** (no all-records flash). Test data cleaned up. `npm run build` passes.
 
 ### Phase 6 — Detail & CRUD
 - [ ] 6.1 Detail view (all fields + images)
@@ -174,6 +184,10 @@ unauth → 401; **cross-tenant record → 404 and excluded from list** (isolatio
 | `src/app/licenses/page.tsx` | 4 | Journal list page (gated) — server-renders page 1, hands off to the client table |
 | `src/app/licenses/LicenseTable.tsx` | 4 | Client table — 9 columns, thumbnail, print link, paid/due badge, debounced search, pagination, mobile cards, row→detail |
 | `src/app/licenses/[id]/page.tsx` | 4 | Read-only license detail (tenant-scoped; 404 on miss/cross-tenant); full CRUD/print in Phase 6 |
+| `src/app/licenses/FilterBar.tsx` | 5 | 13-filter bar — quick search + collapsible panel, active-count badge, clear-all; emits a `Filters` object |
+| `src/app/licenses/LicenseTable.tsx` (updated) | 5 | Now owns filter state, URL sync (`useSearchParams`/`router.replace`), debounced refetch; renders `FilterBar` |
+| `src/app/licenses/page.tsx` (updated) | 5 | Accepts `searchParams`, server-renders honoring URL filters, wraps table in `<Suspense>` |
+| `src/lib/validation.ts` / `src/lib/licenseQuery.ts` (updated) | 5 | Added `extractionMethod` + `verified` to `licenseFilterSchema` and the query builder (filter 13) |
 
 ---
 
@@ -241,6 +255,14 @@ unauth → 401; **cross-tenant record → 404 and excluded from list** (isolatio
   **cross-tenant record 404 + excluded from list** (isolation). Fixed a Mongoose-9 `FilterQuery` type-export
   issue (used a local query type). Test data cleaned up. `npm run build` passes.
   Next: **Phase 5** filters (≥10) — the filter-bar UI over the already-wired query builder.
+- **2026-07-07 (10)** — **Phase 5 complete.** Added the 13th filter pair (`extractionMethod` + `verified`) to
+  the schema + query builder, then built the `FilterBar` (quick search + collapsible 13-filter panel, active-count
+  badge, clear-all) and rewired `LicenseTable` so the **URL is the single source of truth** (server first-paint
+  honors URL filters via `searchParams`; client syncs with `router.replace` + debounced refetch; any filter → page 1;
+  table wrapped in `<Suspense>` for `useSearchParams`). **Verified live** (5 varied records): each filter returns the
+  right subset, combined filters AND correctly, and bookmarked filtered URLs server-render filtered. Cleaned up test
+  data. `npm run build` passes. Next: **Phase 6** detail & CRUD (manual create/edit/delete + single-record print +
+  renewal auto-archive §1a).
 
 ## Seeded demo credentials (dev)
 - super_admin: `admin@tradelicense.local` / `admin123`
